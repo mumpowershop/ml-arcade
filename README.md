@@ -1,4 +1,4 @@
-# ML Engineering Interview Platform
+# ML Arcade
 
 An enterprise-ready interview experience that evaluates ML Engineering candidates through engaging challenges and games.
 
