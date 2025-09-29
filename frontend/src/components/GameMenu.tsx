@@ -363,3 +363,4 @@ export const GameMenu: React.FC<GameMenuProps> = ({ onStartGame, onViewStats }) 
     </div>
   );
 };
+

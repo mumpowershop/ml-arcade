@@ -405,3 +405,4 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onGameEnd }) => {
     </div>
   );
 };
+

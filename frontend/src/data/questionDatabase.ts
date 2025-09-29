@@ -417,3 +417,4 @@ export const getNextLevel = (currentLevel: number, totalScore: number) => {
   }
   return currentLevel;
 };
+

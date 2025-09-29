@@ -236,3 +236,4 @@ export const useArcadeSound = () => {
     isMuted: arcadeAudio.muted
   };
 };
+
