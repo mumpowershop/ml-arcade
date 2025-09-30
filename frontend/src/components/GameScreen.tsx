@@ -20,7 +20,7 @@ interface GameScreenProps {
 
 export const GameScreen: React.FC<GameScreenProps> = ({ onGameEnd }) => {
   const gameEngine = useGameEngine();
-  const { playButtonPress, playHover, playError } = useArcadeSound();
+  const { playButtonPress, playHover, playError, startBackgroundMusic, backgroundMusicStatus } = useArcadeSound();
   
   const [gameState, setGameState] = useState(gameEngine.getGameState());
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
@@ -31,6 +31,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({ onGameEnd }) => {
     message: string;
   }>({ show: false, correct: false, message: '' });
   const [showPowerUps, setShowPowerUps] = useState(false);
+
+  useEffect(() => {
+    // Ensure background music is playing during gameplay
+    if (!backgroundMusicStatus.isPlaying) {
+      startBackgroundMusic();
+    }
+  }, [backgroundMusicStatus.isPlaying, startBackgroundMusic]);
 
   useEffect(() => {
     // Set up game engine event listeners

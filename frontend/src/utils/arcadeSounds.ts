@@ -4,6 +4,17 @@
 class ArcadeAudioSystem {
   private audioContext: AudioContext | null = null;
   private isMuted = false;
+  private backgroundMusic: {
+    oscillators: OscillatorNode[];
+    gainNodes: GainNode[];
+    isPlaying: boolean;
+    volume: number;
+  } = {
+    oscillators: [],
+    gainNodes: [],
+    isPlaying: false,
+    volume: 0.15
+  };
 
   constructor() {
     this.initAudio();
@@ -207,6 +218,153 @@ class ArcadeAudioSystem {
     oscillator2.stop(now + 3);
   }
 
+  // 1980s Synthwave Background Music Generator
+  private createSynthwaveLayer(frequency: number, type: OscillatorType, volume: number, delay: number = 0) {
+    if (!this.audioContext) return { oscillator: null, gainNode: null };
+
+    const oscillator = this.createOscillator(frequency, type);
+    const gainNode = this.createGainNode(volume * this.backgroundMusic.volume);
+    const filterNode = this.audioContext.createBiquadFilter();
+    
+    if (!oscillator || !gainNode) return { oscillator: null, gainNode: null };
+
+    // Add some filtering for that retro sound
+    filterNode.type = 'lowpass';
+    filterNode.frequency.setValueAtTime(800 + frequency * 0.5, this.audioContext.currentTime);
+    filterNode.Q.setValueAtTime(1, this.audioContext.currentTime);
+
+    oscillator.connect(filterNode);
+    filterNode.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+
+    // Add some subtle vibrato and filter modulation
+    const lfo = this.audioContext.createOscillator();
+    const lfoGain = this.audioContext.createGain();
+    lfo.frequency.setValueAtTime(4.5, this.audioContext.currentTime);
+    lfoGain.gain.setValueAtTime(2, this.audioContext.currentTime);
+    
+    lfo.connect(lfoGain);
+    lfoGain.connect(oscillator.frequency);
+    
+    const now = this.audioContext.currentTime + delay;
+    oscillator.start(now);
+    lfo.start(now);
+
+    return { oscillator, gainNode, lfo, filterNode };
+  }
+
+  // Start continuous synthwave background music
+  startBackgroundMusic() {
+    if (!this.audioContext || this.backgroundMusic.isPlaying || this.isMuted) return;
+
+    // Resume audio context if suspended (required by some browsers)
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+
+    // Create multiple layers for rich synthwave sound
+    const layers = [
+      // Bass line - deep foundation
+      { freq: 55, type: 'sawtooth' as OscillatorType, vol: 0.3, delay: 0 },
+      { freq: 82.5, type: 'triangle' as OscillatorType, vol: 0.2, delay: 0 },
+      
+      // Mid range - the main melody
+      { freq: 220, type: 'sawtooth' as OscillatorType, vol: 0.25, delay: 0.5 },
+      { freq: 330, type: 'square' as OscillatorType, vol: 0.15, delay: 1.0 },
+      
+      // High range - sparkly cyberpunk touches
+      { freq: 880, type: 'sine' as OscillatorType, vol: 0.1, delay: 1.5 },
+      { freq: 1320, type: 'triangle' as OscillatorType, vol: 0.08, delay: 2.0 },
+      
+      // Atmospheric pad
+      { freq: 165, type: 'sine' as OscillatorType, vol: 0.12, delay: 0 }
+    ];
+
+    layers.forEach(layer => {
+      const { oscillator, gainNode, lfo } = this.createSynthwaveLayer(
+        layer.freq, layer.type, layer.vol, layer.delay
+      );
+      
+      if (oscillator && gainNode) {
+        this.backgroundMusic.oscillators.push(oscillator);
+        this.backgroundMusic.gainNodes.push(gainNode);
+        if (lfo) this.backgroundMusic.oscillators.push(lfo);
+      }
+    });
+
+    this.backgroundMusic.isPlaying = true;
+
+    // Restart the music every 16 seconds for seamless looping
+    setTimeout(() => {
+      if (this.backgroundMusic.isPlaying) {
+        this.stopBackgroundMusic();
+        setTimeout(() => this.startBackgroundMusic(), 100);
+      }
+    }, 16000);
+  }
+
+  // Stop background music
+  stopBackgroundMusic() {
+    if (!this.backgroundMusic.isPlaying) return;
+
+    // Fade out gracefully
+    const fadeTime = 0.5;
+    const now = this.audioContext?.currentTime || 0;
+    
+    this.backgroundMusic.gainNodes.forEach(gainNode => {
+      if (gainNode) {
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
+      }
+    });
+
+    // Stop all oscillators
+    setTimeout(() => {
+      this.backgroundMusic.oscillators.forEach(osc => {
+        try {
+          osc.stop();
+        } catch (e) {
+          // Oscillator might already be stopped
+        }
+      });
+      
+      this.backgroundMusic.oscillators = [];
+      this.backgroundMusic.gainNodes = [];
+      this.backgroundMusic.isPlaying = false;
+    }, fadeTime * 1000 + 100);
+  }
+
+  // Toggle background music
+  toggleBackgroundMusic() {
+    if (this.backgroundMusic.isPlaying) {
+      this.stopBackgroundMusic();
+    } else {
+      this.startBackgroundMusic();
+    }
+    return this.backgroundMusic.isPlaying;
+  }
+
+  // Set background music volume (0.0 to 1.0)
+  setBackgroundMusicVolume(volume: number) {
+    this.backgroundMusic.volume = Math.max(0, Math.min(1, volume));
+    
+    // Update existing gain nodes
+    this.backgroundMusic.gainNodes.forEach(gainNode => {
+      if (gainNode && this.audioContext) {
+        const currentGain = gainNode.gain.value;
+        const baseVolume = currentGain / (this.backgroundMusic.volume || 1);
+        gainNode.gain.setValueAtTime(baseVolume * this.backgroundMusic.volume, this.audioContext.currentTime);
+      }
+    });
+  }
+
+  // Get background music status
+  get backgroundMusicStatus() {
+    return {
+      isPlaying: this.backgroundMusic.isPlaying,
+      volume: this.backgroundMusic.volume
+    };
+  }
+
   // Toggle mute
   toggleMute() {
     this.isMuted = !this.isMuted;
@@ -233,7 +391,14 @@ export const useArcadeSound = () => {
     playTyping: () => arcadeAudio.playTyping(),
     playAmbientTone: () => arcadeAudio.playAmbientTone(),
     toggleMute: () => arcadeAudio.toggleMute(),
-    isMuted: arcadeAudio.muted
+    isMuted: arcadeAudio.muted,
+    
+    // Background music controls
+    startBackgroundMusic: () => arcadeAudio.startBackgroundMusic(),
+    stopBackgroundMusic: () => arcadeAudio.stopBackgroundMusic(),
+    toggleBackgroundMusic: () => arcadeAudio.toggleBackgroundMusic(),
+    setBackgroundMusicVolume: (volume: number) => arcadeAudio.setBackgroundMusicVolume(volume),
+    backgroundMusicStatus: arcadeAudio.backgroundMusicStatus
   };
 };
 

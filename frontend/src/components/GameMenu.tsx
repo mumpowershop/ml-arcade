@@ -11,7 +11,9 @@ import {
   Play,
   Settings,
   Volume2,
-  VolumeX
+  VolumeX,
+  Music,
+  Pause
 } from 'lucide-react';
 
 interface GameMenuProps {
@@ -21,16 +23,36 @@ interface GameMenuProps {
 
 export const GameMenu: React.FC<GameMenuProps> = ({ onStartGame, onViewStats }) => {
   const gameEngine = useGameEngine();
-  const { playButtonPress, playHover, toggleMute } = useArcadeSound();
+  const { 
+    playButtonPress, 
+    playHover, 
+    toggleMute, 
+    startBackgroundMusic,
+    stopBackgroundMusic,
+    toggleBackgroundMusic,
+    setBackgroundMusicVolume,
+    backgroundMusicStatus
+  } = useArcadeSound();
   
   const [stats, setStats] = useState<GameStats>(gameEngine.getStats());
   const [selectedLevel, setSelectedLevel] = useState(1);
   const [showLevelSelect, setShowLevelSelect] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(0.15);
+  const [showAudioControls, setShowAudioControls] = useState(false);
 
   useEffect(() => {
     setStats(gameEngine.getStats());
   }, [gameEngine]);
+
+  // Auto-start background music on component mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      startBackgroundMusic();
+    }, 1000); // Start music after 1 second delay
+
+    return () => clearTimeout(timer);
+  }, [startBackgroundMusic]);
 
   const handleStartGame = () => {
     playButtonPress();
@@ -47,7 +69,28 @@ export const GameMenu: React.FC<GameMenuProps> = ({ onStartGame, onViewStats }) 
   const handleMuteToggle = () => {
     const muted = toggleMute();
     setIsMuted(muted);
-    if (!muted) playButtonPress();
+    if (muted) {
+      stopBackgroundMusic();
+    } else {
+      playButtonPress();
+      startBackgroundMusic();
+    }
+  };
+
+  const handleMusicToggle = () => {
+    const isPlaying = toggleBackgroundMusic();
+    playButtonPress();
+  };
+
+  const handleMusicVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const volume = parseFloat(e.target.value);
+    setMusicVolume(volume);
+    setBackgroundMusicVolume(volume);
+  };
+
+  const toggleAudioControls = () => {
+    setShowAudioControls(!showAudioControls);
+    playHover();
   };
 
   const categories = [
@@ -320,8 +363,63 @@ export const GameMenu: React.FC<GameMenuProps> = ({ onStartGame, onViewStats }) 
                     {isMuted ? <VolumeX className="h-5 w-5 mr-2" /> : <Volume2 className="h-5 w-5 mr-2" />}
                     AUDIO {isMuted ? 'OFF' : 'ON'}
                   </button>
+
+                  {/* Expandable Audio Controls */}
+                  <button
+                    onClick={toggleAudioControls}
+                    className="btn btn-outline btn-sm w-full flex items-center justify-center"
+                    onMouseEnter={() => playHover()}
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    AUDIO CONFIG {showAudioControls ? '▼' : '▶'}
+                  </button>
+
+                  {showAudioControls && (
+                    <div className="space-y-2 mt-3 p-3 border border-cyan-600 rounded pixel-corners bg-black bg-opacity-50">
+                      {/* Background Music Toggle */}
+                      <button
+                        onClick={handleMusicToggle}
+                        className={`btn btn-sm w-full flex items-center justify-center ${
+                          backgroundMusicStatus.isPlaying ? 'btn-success' : 'btn-outline'
+                        }`}
+                        onMouseEnter={() => playHover()}
+                        disabled={isMuted}
+                      >
+                        {backgroundMusicStatus.isPlaying ? 
+                          <Pause className="h-4 w-4 mr-2" /> : 
+                          <Music className="h-4 w-4 mr-2" />
+                        }
+                        SYNTHWAVE {backgroundMusicStatus.isPlaying ? 'ON' : 'OFF'}
+                      </button>
+
+                      {/* Music Volume Slider */}
+                      <div className="space-y-1">
+                        <label className="text-xs neon-text-pink block" style={{fontFamily: 'Press Start 2P, monospace'}}>
+                          MUSIC VOL
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="0.4"
+                          step="0.05"
+                          value={musicVolume}
+                          onChange={handleMusicVolumeChange}
+                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-neon"
+                          disabled={isMuted}
+                        />
+                        <div className="text-xs text-cyan-400 text-center" style={{fontFamily: 'Orbitron, monospace'}}>
+                          {Math.round(musicVolume * 100)}%
+                        </div>
+                      </div>
+
+                      <div className="text-xs neon-text-pink text-center pt-2" style={{fontFamily: 'Press Start 2P, monospace'}}>
+                        🎵 1980s CYBERPUNK MIX 🎵
+                      </div>
+                    </div>
+                  )}
+
                   <div className="text-xs neon-text-pink text-center" style={{fontFamily: 'Press Start 2P, monospace'}}>
-                    v1.0.0 NEURAL
+                    v1.0.1 SYNTHWAVE
                   </div>
                 </div>
               </div>
