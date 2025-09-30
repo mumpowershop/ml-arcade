@@ -413,13 +413,13 @@ export const GameMenu: React.FC<GameMenuProps> = ({ onStartGame, onViewStats }) 
                       </div>
 
                       <div className="text-xs neon-text-pink text-center pt-2" style={{fontFamily: 'Press Start 2P, monospace'}}>
-                        🎵 1980s CYBERPUNK MIX 🎵
+                        🎵 SYNTHWAVE EPIC: 64s LOOP 🎵
                       </div>
                     </div>
                   )}
 
                   <div className="text-xs neon-text-pink text-center" style={{fontFamily: 'Press Start 2P, monospace'}}>
-                    v1.0.1 SYNTHWAVE
+                    v1.1.0 SYNTHWAVE EPIC
                   </div>
                 </div>
               </div>

@@ -218,39 +218,169 @@ class ArcadeAudioSystem {
     oscillator2.stop(now + 3);
   }
 
-  // 1980s Synthwave Background Music Generator
-  private createSynthwaveLayer(frequency: number, type: OscillatorType, volume: number, delay: number = 0) {
-    if (!this.audioContext) return { oscillator: null, gainNode: null };
+  // Advanced 1980s Synthwave Music Generator
+  private createAdvancedSynthLayer(config: {
+    frequency: number;
+    type: OscillatorType;
+    volume: number;
+    delay: number;
+    filterFreq: number;
+    filterQ: number;
+    envelope?: { attack: number; decay: number; sustain: number; release: number };
+    lfo?: { rate: number; depth: number; target: 'frequency' | 'filter' | 'volume' };
+  }) {
+    if (!this.audioContext) return { oscillator: null, gainNode: null, nodes: [] };
 
-    const oscillator = this.createOscillator(frequency, type);
-    const gainNode = this.createGainNode(volume * this.backgroundMusic.volume);
+    const oscillator = this.createOscillator(config.frequency, config.type);
+    const gainNode = this.createGainNode(config.volume * this.backgroundMusic.volume);
     const filterNode = this.audioContext.createBiquadFilter();
     
-    if (!oscillator || !gainNode) return { oscillator: null, gainNode: null };
+    if (!oscillator || !gainNode) return { oscillator: null, gainNode: null, nodes: [] };
 
-    // Add some filtering for that retro sound
+    const nodes = [oscillator, gainNode, filterNode];
+
+    // Configure filter
     filterNode.type = 'lowpass';
-    filterNode.frequency.setValueAtTime(800 + frequency * 0.5, this.audioContext.currentTime);
-    filterNode.Q.setValueAtTime(1, this.audioContext.currentTime);
+    filterNode.frequency.setValueAtTime(config.filterFreq, this.audioContext.currentTime);
+    filterNode.Q.setValueAtTime(config.filterQ, this.audioContext.currentTime);
 
+    // Create audio chain
     oscillator.connect(filterNode);
     filterNode.connect(gainNode);
     gainNode.connect(this.audioContext.destination);
 
-    // Add some subtle vibrato and filter modulation
-    const lfo = this.audioContext.createOscillator();
-    const lfoGain = this.audioContext.createGain();
-    lfo.frequency.setValueAtTime(4.5, this.audioContext.currentTime);
-    lfoGain.gain.setValueAtTime(2, this.audioContext.currentTime);
-    
-    lfo.connect(lfoGain);
-    lfoGain.connect(oscillator.frequency);
-    
-    const now = this.audioContext.currentTime + delay;
-    oscillator.start(now);
-    lfo.start(now);
+    const now = this.audioContext.currentTime + config.delay;
 
-    return { oscillator, gainNode, lfo, filterNode };
+    // Add envelope if specified
+    if (config.envelope) {
+      const { attack, decay, sustain, release } = config.envelope;
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(config.volume * this.backgroundMusic.volume, now + attack);
+      gainNode.gain.linearRampToValueAtTime(sustain * config.volume * this.backgroundMusic.volume, now + attack + decay);
+    }
+
+    // Add LFO if specified
+    let lfo = null;
+    if (config.lfo) {
+      lfo = this.audioContext.createOscillator();
+      const lfoGain = this.audioContext.createGain();
+      lfo.frequency.setValueAtTime(config.lfo.rate, this.audioContext.currentTime);
+      lfoGain.gain.setValueAtTime(config.lfo.depth, this.audioContext.currentTime);
+      
+      lfo.connect(lfoGain);
+      
+      // Connect LFO to different targets
+      switch (config.lfo.target) {
+        case 'frequency':
+          lfoGain.connect(oscillator.frequency);
+          break;
+        case 'filter':
+          lfoGain.connect(filterNode.frequency);
+          break;
+        case 'volume':
+          lfoGain.connect(gainNode.gain);
+          break;
+      }
+      
+      lfo.start(now);
+      nodes.push(lfo);
+    }
+
+    oscillator.start(now);
+
+    return { oscillator, gainNode, lfo, filterNode, nodes };
+  }
+
+  // Create a musical sequence with chord progressions
+  private createSynthwaveSequence() {
+    if (!this.audioContext) return [];
+
+    // Epic synthwave chord progression: Am - F - C - G (i - VI - III - VII)
+    const chordProgression = [
+      // A minor (A, C, E)
+      { root: 220, third: 261.63, fifth: 329.63, duration: 8 },
+      // F major (F, A, C) 
+      { root: 174.61, third: 220, fifth: 261.63, duration: 8 },
+      // C major (C, E, G)
+      { root: 130.81, third: 164.81, fifth: 196, duration: 8 },
+      // G major (G, B, D)
+      { root: 196, third: 246.94, fifth: 293.66, duration: 8 }
+    ];
+
+    const layers = [];
+    let currentTime = 0;
+
+    // Create multiple passes through the progression for a 64-second loop
+    for (let pass = 0; pass < 2; pass++) {
+      chordProgression.forEach((chord, chordIndex) => {
+        const variation = pass; // Different variations for each pass
+        
+        // Deep bass line following root notes
+        layers.push(this.createAdvancedSynthLayer({
+          frequency: chord.root * 0.5, // One octave lower
+          type: 'sawtooth',
+          volume: 0.3,
+          delay: currentTime,
+          filterFreq: 120,
+          filterQ: 2,
+          lfo: { rate: 0.5, depth: 5, target: 'frequency' }
+        }));
+
+        // Mid bass harmony
+        layers.push(this.createAdvancedSynthLayer({
+          frequency: chord.root,
+          type: 'triangle', 
+          volume: 0.2,
+          delay: currentTime,
+          filterFreq: 300,
+          filterQ: 1
+        }));
+
+        // Arpeggiated lead (playing chord notes in sequence)
+        const arpNotes = [chord.root * 2, chord.third * 2, chord.fifth * 2, chord.third * 2];
+        arpNotes.forEach((noteFreq, noteIndex) => {
+          layers.push(this.createAdvancedSynthLayer({
+            frequency: noteFreq,
+            type: variation === 0 ? 'square' : 'sawtooth',
+            volume: 0.15,
+            delay: currentTime + (noteIndex * chord.duration / 4),
+            filterFreq: 1200 + (variation * 200),
+            filterQ: 0.8,
+            envelope: { attack: 0.1, decay: 0.5, sustain: 0.7, release: 1.0 },
+            lfo: { rate: 4.2, depth: 8, target: 'frequency' }
+          }));
+        });
+
+        // Pad/Atmosphere layer
+        layers.push(this.createAdvancedSynthLayer({
+          frequency: chord.third * 0.75,
+          type: 'sine',
+          volume: 0.12,
+          delay: currentTime,
+          filterFreq: 600,
+          filterQ: 0.5,
+          lfo: { rate: 0.3, depth: 50, target: 'filter' }
+        }));
+
+        // High sparkle layer (every other chord for variation)
+        if (chordIndex % 2 === variation) {
+          layers.push(this.createAdvancedSynthLayer({
+            frequency: chord.fifth * 4,
+            type: 'sine',
+            volume: 0.08,
+            delay: currentTime + 2,
+            filterFreq: 3000,
+            filterQ: 2,
+            envelope: { attack: 0.2, decay: 1.0, sustain: 0.3, release: 2.0 },
+            lfo: { rate: 6, depth: 100, target: 'filter' }
+          }));
+        }
+
+        currentTime += chord.duration;
+      });
+    }
+
+    return layers;
   }
 
   // Start continuous synthwave background music
@@ -262,45 +392,35 @@ class ArcadeAudioSystem {
       this.audioContext.resume();
     }
 
-    // Create multiple layers for rich synthwave sound
-    const layers = [
-      // Bass line - deep foundation
-      { freq: 55, type: 'sawtooth' as OscillatorType, vol: 0.3, delay: 0 },
-      { freq: 82.5, type: 'triangle' as OscillatorType, vol: 0.2, delay: 0 },
-      
-      // Mid range - the main melody
-      { freq: 220, type: 'sawtooth' as OscillatorType, vol: 0.25, delay: 0.5 },
-      { freq: 330, type: 'square' as OscillatorType, vol: 0.15, delay: 1.0 },
-      
-      // High range - sparkly cyberpunk touches
-      { freq: 880, type: 'sine' as OscillatorType, vol: 0.1, delay: 1.5 },
-      { freq: 1320, type: 'triangle' as OscillatorType, vol: 0.08, delay: 2.0 },
-      
-      // Atmospheric pad
-      { freq: 165, type: 'sine' as OscillatorType, vol: 0.12, delay: 0 }
-    ];
-
-    layers.forEach(layer => {
-      const { oscillator, gainNode, lfo } = this.createSynthwaveLayer(
-        layer.freq, layer.type, layer.vol, layer.delay
-      );
-      
-      if (oscillator && gainNode) {
-        this.backgroundMusic.oscillators.push(oscillator);
-        this.backgroundMusic.gainNodes.push(gainNode);
-        if (lfo) this.backgroundMusic.oscillators.push(lfo);
+    // Create the sophisticated synthwave sequence
+    const synthLayers = this.createSynthwaveSequence();
+    
+    // Store all oscillators and gain nodes
+    synthLayers.forEach(layer => {
+      if (layer.oscillator && layer.gainNode) {
+        this.backgroundMusic.oscillators.push(layer.oscillator);
+        this.backgroundMusic.gainNodes.push(layer.gainNode);
+        
+        // Add any additional nodes (LFOs, filters, etc.)
+        if (layer.nodes) {
+          layer.nodes.forEach(node => {
+            if (node !== layer.oscillator && node !== layer.gainNode) {
+              this.backgroundMusic.oscillators.push(node as OscillatorNode);
+            }
+          });
+        }
       }
     });
 
     this.backgroundMusic.isPlaying = true;
 
-    // Restart the music every 16 seconds for seamless looping
+    // Restart the music every 64 seconds for seamless looping of the complete progression
     setTimeout(() => {
       if (this.backgroundMusic.isPlaying) {
         this.stopBackgroundMusic();
-        setTimeout(() => this.startBackgroundMusic(), 100);
+        setTimeout(() => this.startBackgroundMusic(), 500);
       }
-    }, 16000);
+    }, 64000);
   }
 
   // Stop background music
