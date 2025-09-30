@@ -228,7 +228,13 @@ class ArcadeAudioSystem {
     filterQ: number;
     envelope?: { attack: number; decay: number; sustain: number; release: number };
     lfo?: { rate: number; depth: number; target: 'frequency' | 'filter' | 'volume' };
-  }) {
+  }): {
+    oscillator: OscillatorNode | null;
+    gainNode: GainNode | null;
+    lfo?: OscillatorNode | null;
+    filterNode?: BiquadFilterNode | null;
+    nodes?: AudioNode[];
+  } {
     if (!this.audioContext) return { oscillator: null, gainNode: null, nodes: [] };
 
     const oscillator = this.createOscillator(config.frequency, config.type);
@@ -292,7 +298,13 @@ class ArcadeAudioSystem {
   }
 
   // Create a musical sequence with chord progressions
-  private createSynthwaveSequence() {
+  private createSynthwaveSequence(): Array<{
+    oscillator: OscillatorNode | null;
+    gainNode: GainNode | null;
+    lfo?: OscillatorNode | null;
+    filterNode?: BiquadFilterNode | null;
+    nodes?: AudioNode[];
+  }> {
     if (!this.audioContext) return [];
 
     // Epic synthwave chord progression: Am - F - C - G (i - VI - III - VII)
@@ -307,7 +319,13 @@ class ArcadeAudioSystem {
       { root: 196, third: 246.94, fifth: 293.66, duration: 8 }
     ];
 
-    const layers = [];
+    const layers: Array<{
+      oscillator: OscillatorNode | null;
+      gainNode: GainNode | null;
+      lfo?: OscillatorNode | null;
+      filterNode?: BiquadFilterNode | null;
+      nodes?: AudioNode[];
+    }> = [];
     let currentTime = 0;
 
     // Create multiple passes through the progression for a 64-second loop
@@ -403,7 +421,7 @@ class ArcadeAudioSystem {
         
         // Add any additional nodes (LFOs, filters, etc.)
         if (layer.nodes) {
-          layer.nodes.forEach(node => {
+          layer.nodes.forEach((node: AudioNode) => {
             if (node !== layer.oscillator && node !== layer.gainNode) {
               this.backgroundMusic.oscillators.push(node as OscillatorNode);
             }
